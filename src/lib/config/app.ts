@@ -18,5 +18,6 @@ export const MODULES = [
   'math',
   'science',
   'animals',
-  'sounds'
+  'sounds',
+  'ai'
 ] as const;

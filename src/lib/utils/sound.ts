@@ -49,7 +49,13 @@ export function playSfx(type: 'success' | 'error' | 'click'): void {
   playSound(soundMap[type]);
 }
 export async function speak(text: string, language: string = 'en', voiceType: string = 'female'): Promise<void> {
-  // Try Google Cloud TTS first if API key is available
+  // For English, always use Web Speech API
+  if (language === 'en') {
+    speakWithWebSpeechAPI(text, language, voiceType);
+    return;
+  }
+
+  // For other languages, try Google Cloud TTS first if API key is available
   if (GOOGLE_CLOUD_API_KEY) {
     try {
       await speakWithGoogleCloud(text, language, voiceType);
@@ -79,7 +85,7 @@ async function speakWithGoogleCloud(text: string, language: string, voiceType: s
   const payload = {
     input: { text },
     voice: {
-      languageCode: language === 'ar' ? 'ar-XA' : `${language}-IN`,
+      languageCode: language === 'ar' ? 'ar-XA' : (language === 'en' ? 'en-US' : `${language}-IN`),
       name: voiceId
     },
     audioConfig: {
@@ -131,13 +137,12 @@ function speakWithWebSpeechAPI(text: string, language: string, voiceType: string
   const targetLang = languageMap[language] || 'en-US';
   utterance.lang = targetLang;
 
-  // Configure voice based on voice type
+  // Configure voice based on voice type with better distinction
   const voiceConfig: Record<string, { pitch: number; rate: number }> = {
-    female: { pitch: 1.2, rate: 0.9 },
-    male: { pitch: 0.8, rate: 0.9 },
-    kid: { pitch: 1.5, rate: 1.0 },
-    boy: { pitch: 1.0, rate: 1.0 },
-    girl: { pitch: 1.3, rate: 0.95 }
+    female: { pitch: 1.3, rate: 0.85 },      // Higher pitch, slower - adult female
+    male: { pitch: 0.6, rate: 0.85 },        // Much lower pitch, slower - adult male
+    girl: { pitch: 1.6, rate: 1.1 },         // Highest pitch, faster - child girl
+    boy: { pitch: 1.2, rate: 1.1 }           // Higher pitch than male, faster - child boy
   };
 
   const config = voiceConfig[voiceType] || voiceConfig['female'];
@@ -145,6 +150,8 @@ function speakWithWebSpeechAPI(text: string, language: string, voiceType: string
   utterance.pitch = config.pitch;
   utterance.rate = config.rate;
   utterance.volume = 1.0;
+  
+  console.log(`Web Speech API - ${voiceType}: pitch=${config.pitch}, rate=${config.rate}`);
 
   // Load available voices - may need a small delay on some browsers
   let voices = window.speechSynthesis.getVoices();
@@ -209,23 +216,63 @@ function selectVoiceByLanguage(voices: SpeechSynthesisVoice[], fullLang: string,
     return voices[0];
   }
 
-  // Try to find voice matching gender preference
-  const genderMap: Record<string, string[]> = {
-    female: ['female', 'woman', 'female voice'],
-    male: ['male', 'man', 'male voice'],
-    kid: ['child', 'kid'],
-    girl: ['female', 'girl', 'woman'],
-    boy: ['male', 'boy', 'man']
-  };
-
-  const genderKeywords = genderMap[voiceType] || ['female'];
-  
-  for (const keyword of genderKeywords) {
-    const voice = matchingVoices.find(v => v.name.toLowerCase().includes(keyword.toLowerCase()));
-    if (voice) return voice;
+  // Detailed voice type matching
+  if (voiceType === 'female') {
+    // Look for adult female voices
+    const femaleKeywords = ['female', 'woman', 'lady', 'female voice', 'woman voice'];
+    for (const keyword of femaleKeywords) {
+      const voice = matchingVoices.find(v => v.name.toLowerCase().includes(keyword.toLowerCase()));
+      if (voice) {
+        console.log(`Selected FEMALE voice: "${voice.name}"`);
+        return voice;
+      }
+    }
+  } else if (voiceType === 'male') {
+    // Look for adult male voices
+    const maleKeywords = ['male', 'man', 'gentleman', 'male voice', 'man voice'];
+    for (const keyword of maleKeywords) {
+      const voice = matchingVoices.find(v => v.name.toLowerCase().includes(keyword.toLowerCase()));
+      if (voice) {
+        console.log(`Selected MALE voice: "${voice.name}"`);
+        return voice;
+      }
+    }
+  } else if (voiceType === 'girl') {
+    // Look for child/girl voices
+    const girlKeywords = ['girl', 'child', 'kid', 'young female', 'little girl'];
+    for (const keyword of girlKeywords) {
+      const voice = matchingVoices.find(v => v.name.toLowerCase().includes(keyword.toLowerCase()));
+      if (voice) {
+        console.log(`Selected GIRL voice: "${voice.name}"`);
+        return voice;
+      }
+    }
+    // Fallback to female if no girl voice found
+    const femaleVoice = matchingVoices.find(v => v.name.toLowerCase().includes('female'));
+    if (femaleVoice) {
+      console.log(`Selected GIRL voice (fallback to female): "${femaleVoice.name}"`);
+      return femaleVoice;
+    }
+  } else if (voiceType === 'boy') {
+    // Look for child/boy voices
+    const boyKeywords = ['boy', 'child', 'kid', 'young male', 'little boy'];
+    for (const keyword of boyKeywords) {
+      const voice = matchingVoices.find(v => v.name.toLowerCase().includes(keyword.toLowerCase()));
+      if (voice) {
+        console.log(`Selected BOY voice: "${voice.name}"`);
+        return voice;
+      }
+    }
+    // Fallback to male if no boy voice found
+    const maleVoice = matchingVoices.find(v => v.name.toLowerCase().includes('male'));
+    if (maleVoice) {
+      console.log(`Selected BOY voice (fallback to male): "${maleVoice.name}"`);
+      return maleVoice;
+    }
   }
 
-  // Fall back to first matching language voice
+  // Last resort: return first available voice with logging
+  console.log(`No specific voice match for ${voiceType}, using default: "${matchingVoices[0].name}"`);
   return matchingVoices[0];
 }
 
