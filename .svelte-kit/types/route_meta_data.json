@@ -1,0 +1,21 @@
+{
+	"/": [
+		"src/routes/+layout.ts",
+		"src/routes/+layout.ts"
+	],
+	"/home": [
+		"src/routes/+layout.ts"
+	],
+	"/module/[name]": [
+		"src/routes/+layout.ts"
+	],
+	"/play/[activityId]": [
+		"src/routes/+layout.ts"
+	],
+	"/rewards": [
+		"src/routes/+layout.ts"
+	],
+	"/setup": [
+		"src/routes/+layout.ts"
+	]
+}
